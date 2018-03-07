@@ -3,7 +3,7 @@
 #################################################################################
 '''
 List of functions:
- 
+
 
 advance_iterator
 get_technology_by_name
@@ -45,7 +45,9 @@ svg_from_component
 
 import pya
 
-
+import os
+envvar = os.getenv('KLAYOUT_BATCH_MODE', '0')
+is_batch_mode = (envvar == '1')
 
 # Python 2 vs 3 issues:  http://python3porting.com/differences.html
 # Python 2: iterator.next()
@@ -66,7 +68,7 @@ Get Technology functions:
 
 return:
 TECHNOLOGY['dbu'] is the database unit
-TECHNOLOGY['layer name'] is a LayerInfo object. 
+TECHNOLOGY['layer name'] is a LayerInfo object.
 
 '''
 
@@ -79,11 +81,11 @@ SiEPIC.utils.get_technology_by_name('EBeam')
 def get_technology_by_name(tech_name, verbose=False):
     if verbose:
       print("get_technology_by_name()")
-      
+
     if not tech_name:
       pya.MessageBox.warning("Problem with Technology", "Problem with active Technology: please activate a technology (not Default)", pya.MessageBox.Ok)
       return
-      
+
     from ._globals import KLAYOUT_VERSION
     technology = {}
     technology['technology_name']=tech_name
@@ -94,7 +96,7 @@ def get_technology_by_name(tech_name, verbose=False):
 
     import os
     if KLAYOUT_VERSION > 24:
-      lyp_file = pya.Technology.technology_by_name(tech_name).eff_layer_properties_file()	
+      lyp_file = pya.Technology.technology_by_name(tech_name).eff_layer_properties_file()
       technology['base_path'] = pya.Technology.technology_by_name(tech_name).base_path()
     else:
       import fnmatch
@@ -124,10 +126,10 @@ def get_technology_by_name(tech_name, verbose=False):
       technology['INTC_CML_version'] = None
 
     # Layers:
-    file = open(lyp_file, 'r') 
+    file = open(lyp_file, 'r')
     layer_dict = xml_to_dict(file.read())['layer-properties']['properties']
     file.close()
-     
+
     for k in layer_dict:
       layerInfo = k['source'].split('@')[0]
       if 'group-members' in k:
@@ -176,11 +178,11 @@ def get_technology(verbose=False, query_activecellview_technology=False):
       return technology
 
     # "lv.active_cellview().technology" crashes in KLayout 0.24.10 when loading a GDS file (technology not defined yet?) but works otherwise
-    if KLAYOUT_VERSION > 24 or query_activecellview_technology or lv.title != '<empty>': 
+    if KLAYOUT_VERSION > 24 or query_activecellview_technology or lv.title != '<empty>':
       technology_name = lv.active_cellview().technology
 
     technology['technology_name'] = technology_name
-    
+
     if KLAYOUT_VERSION > 24:
       technology['dbu'] = pya.Technology.technology_by_name(technology_name).dbu
     else:
@@ -188,7 +190,7 @@ def get_technology(verbose=False, query_activecellview_technology=False):
         technology['dbu'] = pya.Application.instance().main_window().current_view().active_cellview().layout().dbu
       else:
         technology['dbu'] = 0.001
-      
+
     itr = lv.begin_layers()
     while True:
       if itr == lv.end_layers():
@@ -219,7 +221,7 @@ def load_Waveguides():
   paths = []
   for root, dirnames, filenames in os.walk(pya.Application.instance().application_data_path(), followlinks = True):
     [paths.append(os.path.join(root, filename)) for filename in fnmatch.filter(filenames, 'WAVEGUIDES.xml') if tech_name in root]
-  
+
   waveguides=[]
   if paths:
     with open(paths[0], 'r') as file:
@@ -249,7 +251,7 @@ def load_Calibre():
           matches.append(os.path.join(root, filename))
   if matches:
     CALIBRE_file = matches[0]
-    file = open(CALIBRE_file, 'r') 
+    file = open(CALIBRE_file, 'r')
     CALIBRE = xml_to_dict(file.read())
     file.close()
     return CALIBRE
@@ -275,7 +277,7 @@ def load_Monte_Carlo():
       if not isinstance(montecarlo, list):
         montecarlo = [montecarlo]
   return montecarlo if montecarlo else None
-  
+
 '''
 Load Design-for-Test (DFT) rules
 These are technology specific, and located in the tech folder, named DFT.xml
@@ -295,7 +297,7 @@ def load_DFT():
           matches.append(os.path.join(root, filename))
   if matches:
     DFT_file = matches[0]
-    file = open(DFT_file, 'r') 
+    file = open(DFT_file, 'r')
     DFT = xml_to_dict(file.read())
     file.close()
     return DFT
@@ -321,10 +323,10 @@ def load_FDTD_settings():
           matches.append(os.path.join(root, filename))
   if matches:
     f = matches[0]
-    file = open(f, 'r') 
+    file = open(f, 'r')
     FDTD = xml_to_dict(file.read())
     file.close()
-    
+
     FDTD = FDTD['FDTD']
     FDTD1 = {}
     for k in FDTD['floats'].keys():
@@ -345,7 +347,7 @@ def get_layout_variables():
     print("No view selected")
     raise UserWarning("No view selected. Make sure you have an open layout.")
   # Find the currently selected layout.
-  ly = pya.Application.instance().main_window().current_view().active_cellview().layout() 
+  ly = pya.Application.instance().main_window().current_view().active_cellview().layout()
   if ly == None:
     raise UserWarning("No layout. Make sure you have an open layout.")
   # find the currently selected cell:
@@ -356,21 +358,21 @@ def get_layout_variables():
 
 
   return TECHNOLOGY, lv, ly, cell
-   
-  
+
+
 #Define an Enumeration type for Python
 def enum(*sequential, **named):
     enums = dict(zip(sequential, range(len(sequential))), **named)
     return type('Enum', (), enums)
 
-# Find all paths, full hierarachy scan, return polygons on top cell. 
+# Find all paths, full hierarachy scan, return polygons on top cell.
 # for Verfication
 def find_paths(layer, cell = None):
   lv = pya.Application.instance().main_window().current_view()
   if lv == None:
     raise Exception("No view selected")
   if cell is None:
-    ly = lv.active_cellview().layout() 
+    ly = lv.active_cellview().layout()
     if ly == None:
       raise Exception("No active layout")
     cell = lv.active_cellview().cell
@@ -378,27 +380,27 @@ def find_paths(layer, cell = None):
       raise Exception("No active cell")
   else:
     ly = cell.layout()
-    
+
   selection = []
   itr = cell.begin_shapes_rec(ly.layer(layer))
   while not(itr.at_end()):
     if itr.shape().is_path():
       selection.append (itr.shape().path.transformed(itr.trans()))
     itr.next()
-    
+
   return selection
 
-#Return all selected opt_in Text labels. 
+#Return all selected opt_in Text labels.
 # example usage: selected_opt_in_text()[0].shape.text.string
 def selected_opt_in_text():
   from .utils import get_layout_variables
   TECHNOLOGY, lv, ly, cell = get_layout_variables()
-  
+
   selection = lv.object_selection
   selection = [o for o in selection if (not o.is_cell_inst()) and o.shape.is_text() and 'opt_in' in o.shape.text.string]
   return selection
-  
-  
+
+
 #Return all selected paths. If nothing is selected, select paths automatically
 def select_paths(layer, cell = None, verbose=None):
   if verbose:
@@ -409,7 +411,7 @@ def select_paths(layer, cell = None, verbose=None):
     raise Exception("No view selected")
 
   if cell is None:
-    ly = lv.active_cellview().layout() 
+    ly = lv.active_cellview().layout()
     if ly == None:
       raise Exception("No active layout")
     cell = lv.active_cellview().cell
@@ -417,7 +419,7 @@ def select_paths(layer, cell = None, verbose=None):
       raise Exception("No active cell")
   else:
     ly = cell.layout()
-    
+
   selection = lv.object_selection
   if selection == []:
     itr = cell.begin_shapes_rec(ly.layer(layer))
@@ -439,7 +441,7 @@ def select_paths(layer, cell = None, verbose=None):
   if verbose:
     print ("SiEPIC.utils.select_paths: selection: %s" % lv.object_selection)
   return lv.object_selection
-  
+
 #Return all selected waveguides. If nothing is selected, select waveguides automatically
 #Returns all cell_inst
 def select_waveguides(cell = None):
@@ -448,7 +450,7 @@ def select_waveguides(cell = None):
     raise Exception("No view selected")
 
   if cell is None:
-    ly = lv.active_cellview().layout() 
+    ly = lv.active_cellview().layout()
     if ly == None:
       raise Exception("No active layout")
     cell = lv.active_cellview().cell
@@ -467,17 +469,17 @@ def select_waveguides(cell = None):
     lv.object_selection = selection
   else:
     lv.object_selection = [o for o in selection if o.is_cell_inst() and o.inst().cell.basic_name() == "Waveguide"]
-    
+
   return lv.object_selection
-  
-#Return all selected instances. 
+
+#Return all selected instances.
 #Returns all cell_inst
 def select_instances(cell = None):
   lv = pya.Application.instance().main_window().current_view()
   if lv == None:
     raise Exception("No view selected")
   if cell is None:
-    ly = lv.active_cellview().layout() 
+    ly = lv.active_cellview().layout()
     if ly == None:
       raise Exception("No active layout")
     cell = lv.active_cellview().cell
@@ -495,9 +497,9 @@ def select_instances(cell = None):
     lv.object_selection = selection
   else:
     lv.object_selection = [o for o in selection if o.is_cell_inst()]
-    
+
   return lv.object_selection
-  
+
 
 #Find the angle between two vectors (not necessarily the smaller angle)
 def angle_b_vectors(u, v):
@@ -519,7 +521,7 @@ def angle_trunc(a, trunc):
   return ((a%trunc)+trunc)%trunc
 
 
-# Calculate the recommended number of points in a circle, based on 
+# Calculate the recommended number of points in a circle, based on
 # http://stackoverflow.com/questions/11774038/how-to-render-a-circle-with-as-few-vertices-as-possible
 def points_per_circle(radius):
   from math import acos, pi, ceil
@@ -538,7 +540,7 @@ def arc(r, theta_start, theta_stop):
 
   from math import pi, cos, sin
   from .utils import points_per_circle
-  
+
   circle_fraction = abs(theta_stop-theta_start) / 360.0
   npoints = int(points_per_circle(r) * circle_fraction)
   if npoints==0:
@@ -560,7 +562,7 @@ def arc_xy(x, y, r, theta_start, theta_stop, DevRec=None):
 
   from math import pi, cos, sin
   from .utils import points_per_circle
-  
+
   circle_fraction = abs(theta_stop-theta_start) / 360.0
   npoints = int(points_per_circle(r) * circle_fraction)
   if DevRec:
@@ -584,7 +586,7 @@ def arc_wg(radius, w, theta_start, theta_stop, DevRec=None):
 
   from math import pi, cos, sin
   from .utils import points_per_circle
-  
+
   print("SiEPIC.utils arc_wg")
   circle_fraction = abs(theta_stop-theta_start) / 360.0
   npoints = int(points_per_circle(radius) * circle_fraction)
@@ -612,7 +614,7 @@ def arc_wg_xy(x, y, r, w, theta_start, theta_stop, DevRec=None):
 
   from math import pi, cos, sin
   from .utils import points_per_circle
-  
+
   circle_fraction = abs(theta_stop-theta_start) / 360.0
   npoints = int(points_per_circle(r) * circle_fraction)
   if DevRec:
@@ -647,7 +649,7 @@ def arc_bezier(radius, start, stop, bezier,DevRec=None):
   yB = 3*yp[2] - 6*yp[1] + 3*yp[0]
   yC = 3*yp[1] - 3*yp[0]
   yD = yp[0]
-  
+
   pts = [pya.Point(-L,0) + pya.Point(xD, yD)]
   for i in range(1, N-1):
     t = i*diff
@@ -655,7 +657,7 @@ def arc_bezier(radius, start, stop, bezier,DevRec=None):
   pts.extend([pya.Point(0, L-1), pya.Point(0,L)])
   return pts
 
-#Take a list of points and create a polygon of width 'width' 
+#Take a list of points and create a polygon of width 'width'
 def arc_to_waveguide(pts, width):
   return pya.Polygon(translate_from_normal(pts, -width/2.) + translate_from_normal(pts, width/2.)[::-1])
 
@@ -667,14 +669,14 @@ def translate_from_normal(pts, trans):
   d = 1./(len(pts)-1)
   a = angle_vector(pts[1]-pts[0])*pi/180 + (pi/2 if trans > 0 else -pi/2)
   tpts = [pts[0] + pya.DPoint(abs(trans)*cos(a), abs(trans)*sin(a))]
-  
+
   for i in range(1, len(pts)-1):
     dpt = (pts[i+1]-pts[i-1])*(2/d)
     tpts.append(pts[i] + pya.DPoint(-dpt.y, dpt.x)*(trans/1/dpt.abs()))
-    
+
   a = angle_vector(pts[-1]-pts[-2])*pi/180 + (pi/2 if trans > 0 else -pi/2)
   tpts.append(pts[-1] + pya.DPoint(abs(trans)*cos(a), abs(trans)*sin(a)))
-  
+
   #Make ends manhattan
   if abs(tpts[0].x - pts[0].x) > abs(tpts[0].y - pts[0].y):
     tpts[0].y = pts[0].y
@@ -705,8 +707,8 @@ def pt_intersects_segment(a, b, c):
 # cell = pya.Application.instance().main_window().current_view().active_cellview().cell
 # layout_pgtext(cell, LayerInfo(10, 0), 0, 0, "test", 1)
 def layout_pgtext(cell, layer, x, y, text, mag, inv = False):
-  pcell = cell.layout().create_cell("TEXT", "Basic", {"text": text, 
-                                                      "layer": layer, 
+  pcell = cell.layout().create_cell("TEXT", "Basic", {"text": text,
+                                                      "layer": layer,
                                                       "mag": mag,
                                                       "inverse": inv })
   dbu = cell.layout().dbu
@@ -736,7 +738,7 @@ def find_automated_measurement_labels(topcell=None, LayerTextN=None):
       print("No view selected")
       raise UserWarning("No view selected. Make sure you have an open layout.")
     # Find the currently selected layout.
-    ly = pya.Application.instance().main_window().current_view().active_cellview().layout() 
+    ly = pya.Application.instance().main_window().current_view().active_cellview().layout()
     if ly == None:
       raise UserWarning("No layout. Make sure you have an open layout.")
     # find the currently selected cell:
@@ -744,7 +746,7 @@ def find_automated_measurement_labels(topcell=None, LayerTextN=None):
     topcell = pya.Application.instance().main_window().current_view().active_cellview().cell
     if topcell == None:
       raise UserWarning("No cell. Make sure you have an open layout.")
-    
+
   text_out = '% X-coord, Y-coord, Polarization, wavelength, type, deviceID, params <br>'
   dbu = topcell.layout().dbu
   iter = topcell.begin_shapes_rec(topcell.layout().layer(LayerTextN))
@@ -777,7 +779,7 @@ try:
 except NameError:
   def advance_iterator(it):
     return it.next()
-    
+
 
 
 # XML to Dict parser, from:
@@ -810,13 +812,13 @@ def xml_to_dict(t):
   except:
     raise UserWarning("Error in the XML file.")
   return etree_to_dict(e)
-  
+
 
 def eng_str(x):
     import math
     # x input in meters
     # output in meters, engineering notation, rounded to 1 nm
-    
+
     EngExp_notation = 1 # 1 = "1.0e-6", 0 = "1.0u"
     x = round(x*1E9)/1E9
     y = abs(x)
@@ -848,8 +850,8 @@ def eng_str(x):
 # Save an SVG file for the component, for INTC icons
 def svg_from_component(component, filename, verbose = False):
 #  from utils import get_technology
-  TECHNOLOGY = get_technology() 
-  
+  TECHNOLOGY = get_technology()
+
   # get polygons from component
   polygons = component.get_polygons(include_pins=False)
 
@@ -857,9 +859,9 @@ def svg_from_component(component, filename, verbose = False):
   width,height = component.DevRec_polygon.bbox().width(), component.DevRec_polygon.bbox().height()
   scale = max(width,height)/0.64
   s1,s2 = (64,64*height/width) if width > height else (64*width/height,64)
-  
+
   polygons_vertices = [[[round((vertex.x-x)*100./scale+s1/2,2), round((y-vertex.y)*100./scale+s2/2,2)] for vertex in p.each_point()] for p in [p.to_simple_polygon() for p in polygons] ]
- 
+
   import svgwrite
   try:  # not sure why the first time it gives an error (Windows 8.1 lukas VM)
     dwg = svgwrite.Drawing(filename, size=(str(s1)+'%', str(s2)+'%'),debug=False)
@@ -872,7 +874,7 @@ def svg_from_component(component, filename, verbose = False):
   except:
     print(" SiEPIC.utils.svg_from_component: could not generate svg")
     return
-    
+
   if TECHNOLOGY['Waveguide_color'] > 0:
     c=bytearray.fromhex(hex(TECHNOLOGY['Waveguide_color'])[4:-1])
   else:
@@ -882,7 +884,7 @@ def svg_from_component(component, filename, verbose = False):
     if verbose:
       print ('polygon: %s' %polygons_vertices[i])
     p = dwg.add (dwg.polyline(polygons_vertices[i], fill=color,debug=False))  # stroke=color
-    
+
   dwg.save()
 
 

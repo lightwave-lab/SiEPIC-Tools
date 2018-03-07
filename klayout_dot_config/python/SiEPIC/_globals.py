@@ -1,14 +1,16 @@
 import pya
 
-# Netlist extraction will merge straight+bend sections into waveguide (1), 
+# Netlist extraction will merge straight+bend sections into waveguide (1),
 # or extract each bend, straight section, etc. (0)
 #WAVEGUIDE_extract_simple = 1
 SIMPLIFY_NETLIST_EXTRACTION = True
 
 #Create GUI's
 from .core import WaveguideGUI, MonteCarloGUI, Net, Component
-WG_GUI = WaveguideGUI()
-MC_GUI = MonteCarloGUI()
+from .utils import is_batch_mode
+if not is_batch_mode:
+  WG_GUI = WaveguideGUI()
+  MC_GUI = MonteCarloGUI()
 
 # ******** lukasc
 # don't use a global one.. based on cells
@@ -31,7 +33,7 @@ try:
   import numpy
 except ImportError:
   MODULE_NUMPY = False
-  
+
 #ACTIONS = []
 
 KLAYOUT_VERSION = int(pya.Application.instance().version().split('.')[1])
@@ -44,7 +46,7 @@ PATH_SNAP_PIN_MAXDIST = 20
 
 
 # Load INTC element library details KLayout application data path
-import os 
+import os
 path = os.path.join(pya.Application.instance().application_data_path(), 'Lumerical_CMLs')
 path = os.path.join(path,"Lumerical_INTC_CMLs.txt")
 INTC_ELEMENTS = ''
@@ -53,23 +55,23 @@ if os.path.exists(path):
   fh = open(path, "r")
   INTC_ELEMENTS = fh.read()
   fh.close()
-  
+
 try:
   INTC
 except:
-  INTC = None  
+  INTC = None
   print('resetting Lumerical INTERCONNECT Python integration')
 
 try:
   FDTD
 except:
-  FDTD = None  
+  FDTD = None
   print('resetting Lumerical FDTD Python integration')
 
 try:
   LUMAPI
 except:
-  LUMAPI = None  
+  LUMAPI = None
   print('resetting Lumerical Python integration')
 
 

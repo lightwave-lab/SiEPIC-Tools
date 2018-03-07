@@ -22,20 +22,20 @@ pya.Path and pya.DPath Extensions:
   - snap(pins), snaps the path in place to the nearest pin
   - to_dtype(dbu), for KLayout < 0.25, integer to float using dbu
   - to_itype(dbu), for KLayout < 0.25, float to integer using dbu
-  
+
 pya.Polygon and pya.DPolygon Extensions:
   - get_points(), returns list of pya.Points
   - get_dpoints(), returns list of pya.DPoints
-  - to_dtype(dbu), for KLayout < 0.25, integer using dbu to float 
-  
+  - to_dtype(dbu), for KLayout < 0.25, integer using dbu to float
+
 pya.PCellDeclarationHelper Extensions:
   - print_parameter_list, prints parameter list
-  
+
 pya.Cell Extensions:
   - print_parameter_values, if this cell is a pcell, prints the parameter values
   - find_pins: find Pin object of either the specified name or all pins in a cell
   - find_pin
-  - find_pins_component 
+  - find_pins_component
   - find_components
   - identify_nets
   - get_LumericalINTERCONNECT_analyzers
@@ -57,9 +57,11 @@ pya.Point Extensions:
 
 import pya
 
-warning = pya.QMessageBox()
-warning.setStandardButtons(pya.QMessageBox.Ok)
-warning.setDefaultButton(pya.QMessageBox.Ok)
+from .utils import is_batch_mode
+if not is_batch_mode:
+  warning = pya.QMessageBox()
+  warning.setStandardButtons(pya.QMessageBox.Ok)
+  warning.setDefaultButton(pya.QMessageBox.Ok)
 
 #################################################################################
 #                SiEPIC Class Extension of Path & DPath Class                   #
@@ -101,12 +103,12 @@ def is_manhattan(self):
   else:
     pts = self.get_dpoints()
   if len(pts) == 2:
-    return True 
+    return True
   for i, pt in enumerate(pts[0:-1]):
-    if not (pts[i].x == pts[i+1].x or pts[i].y == pts[i+1].y): 
+    if not (pts[i].x == pts[i+1].x or pts[i].y == pts[i+1].y):
       return False
   return True
-  
+
 def radius_check(self, radius):
   def all2(iterable):
     for element in iterable:
@@ -150,7 +152,7 @@ def unique_points(self):
   self.points = output
   return self
 
-  
+
 def translate_from_center(self, offset):
   from math import pi, cos, sin, acos, sqrt
   from .utils import angle_vector
@@ -173,7 +175,7 @@ def translate_from_center(self, offset):
     else:
       o1 = pya.DPoint(abs(offset)*cos(angle_vector(u)*pi/180+pi/2), abs(offset)*sin(angle_vector(u)*pi/180+pi/2))
       o2 = pya.DPoint(abs(offset)*cos(angle_vector(v)*pi/180-pi/2), abs(offset)*sin(angle_vector(v)*pi/180-pi/2))
-      
+
     p1 = u+o1
     p2 = o1
     p3 = v+o2
@@ -190,14 +192,14 @@ def translate_from_center(self, offset):
     return pya.Path([pya.Point(pt.x, pt.y) for pt in tpts], self.width)
   elif self.__class__ == pya.DPath:
     return pya.DPath(tpts, self.width)
-    
+
 '''
 snap - pya.Path extension
 This function snaps the two path endpoints to the nearest pins by adjusting the end segments
 
-Input: 
+Input:
  - self: the Path object
- - pins: an array of Pin objects, which are paths with 2 points, 
+ - pins: an array of Pin objects, which are paths with 2 points,
          with the vector giving the direction (out of the component)
 Output:
  - modifies the original Path
@@ -208,7 +210,7 @@ def snap(self, pins):
   from .utils import angle_vector, get_technology
   from . import _globals
   TECHNOLOGY = get_technology()
-    
+
   # Search for pins within this distance to the path endpoints, e.g., 10 microns
   d_min = _globals.PATH_SNAP_PIN_MAXDIST/TECHNOLOGY['dbu'];
 
@@ -219,9 +221,9 @@ def snap(self, pins):
 
   # angles of all segments:
   ang = angle_vector(pts[0]-pts[1])
-  
+
   # sort all the pins based on distance to the Path endpoint
-  # only consider pins that are facing each other, 180 degrees 
+  # only consider pins that are facing each other, 180 degrees
   pins_sorted = sorted([pin for pin in pins if round((ang - pin.rotation)%360) == 180 and pin.type == _globals.PIN_TYPES.OPTICAL], key=lambda x: x.center.distance(pts[0]))
 
   if len(pins_sorted):
@@ -236,8 +238,8 @@ def snap(self, pins):
         pts[1].y += dpt.y
       else:
         pts[1].x += dpt.x
-        
-  # do the same thing on the other end:  
+
+  # do the same thing on the other end:
   ang = angle_vector(pts[-1]-pts[-2])
   pins_sorted = sorted([pin for pin in pins if round((ang - pin.rotation)%360) == 180 and pin.type == _globals.PIN_TYPES.OPTICAL], key=lambda x: x.center.distance(pts[-1]))
   if len(pins_sorted):
@@ -331,7 +333,7 @@ def print_parameter_list(self):
 #################################################################################
 
 pya.PCellDeclarationHelper.print_parameter_list = print_parameter_list
-  
+
 #################################################################################
 #                    SiEPIC Class Extension of Cell Class                       #
 #################################################################################
@@ -346,10 +348,10 @@ def print_parameter_values(self):
     print("Parameter: %s, Value: %s") % (key, params[key])
 
 '''
-Optical Pins have: 
+Optical Pins have:
  1) path on layer PinRec, indicating direction (out of component)
  2) text on layer PinRec, inside the path
-Electrical Pins have: 
+Electrical Pins have:
  1) box on layer PinRec
  2) text on layer PinRec, inside the box
 '''
@@ -364,7 +366,7 @@ def find_pins(self, verbose=False, polygon_devrec=None):
 
   # array to store Pin objects
   pins = []
-  
+
   # Pin Recognition layer
   if not 'PinRec' in TECHNOLOGY:
     pya.MessageBox.warning("Problem with Technology", "Problem with active Technology: missing layer PinRec", pya.MessageBox.Ok)
@@ -424,14 +426,14 @@ def find_pins(self, verbose=False, polygon_devrec=None):
         error_text += ("Invalid pin Box detected: %s, Cell: %s, Electrical Pins must have a pin name." % (pin_box, subcell.name))
 #        raise Exception("Invalid pin Box detected: %s.\nElectrical Pins must have a pin name." % pin_box)
       pins.append(Pin(box=pin_box, _type=_globals.PIN_TYPES.ELECTRICAL, pin_name=pin_name))
-      
+
     it.next()
 
   # Optical IO (Fibre) Recognition layer
   if not 'FbrTgt' in TECHNOLOGY:
     pya.MessageBox.warning("Problem with Technology", "Problem with active Technology: missing layer FbrTgt", pya.MessageBox.Ok)
     return
-    
+
   LayerFbrTgtN = self.layout().layer(TECHNOLOGY['FbrTgt'])
 
   # iterate through all the FbrTgt shapes in the cell
@@ -453,7 +455,7 @@ def find_pins(self, verbose=False, polygon_devrec=None):
         iter2.next()
       # Store the pin information in the pins array
       pins.append(Pin(path=it.shape().polygon.transformed(it.itrans()),
-         _type=_globals.PIN_TYPES.OPTICALIO, 
+         _type=_globals.PIN_TYPES.OPTICALIO,
          pin_name=pin_name))
     it.next()
 
@@ -463,7 +465,7 @@ def find_pins(self, verbose=False, polygon_devrec=None):
 
   # return the array of pins
   return pins
-  
+
 def find_pin(self, name):
   from . import _globals
   from .core import Pin
@@ -476,14 +478,14 @@ def find_pin(self, name):
     if it.shape().is_text() and it.shape().text.string == name:
       label = it.shape().text.transformed(it.itrans())
     it.next()
-    
+
   if label is None: return None
-  
+
   for pin in pins:
     pts = pin.get_points()
     if (pts[0]+pts[1])*0.5 == pya.Point(label.x, label.y):
       return Pin(pin, _globals.PIN_TYPES.OPTICAL)
-    
+
   return None
 
 # find the pins inside a component
@@ -504,19 +506,19 @@ def find_components(self, verbose=False, cell_selected=None):
   Function to traverse the cell's hierarchy and find all the components
   returns list of components (class Component)
   Use the DevRec shapes.  Assumption: One DevRec shape per component.
-  
-  Find all the DevRec shapes; identify the component it belongs; record the info as a Component 
+
+  Find all the DevRec shapes; identify the component it belongs; record the info as a Component
   for each component instance, also find the Pins and Fibre ports.
-  
+
   Find all the pins for the component, save in components and also return pin list.
   Use the pin names on layer PinRec to sort the pins in alphabetical order
-  
+
   cell_selected: only find components that match this specific cell.
-  
+
   '''
   if verbose:
     print('*** Cell.find_components:')
-  
+
   components = []
 
   from .core import Component
@@ -528,7 +530,7 @@ def find_components(self, verbose=False, cell_selected=None):
   # Find all the DevRec shapes
   LayerDevRecN = self.layout().layer(TECHNOLOGY['DevRec'])
   iter1 = self.begin_shapes_rec(LayerDevRecN)
-  
+
   while not(iter1.at_end()):
     idx = len(components) # component index value to be assigned to Component.idx
     component_ID = idx
@@ -538,7 +540,7 @@ def find_components(self, verbose=False, cell_selected=None):
       iter1.next()
       continue
     component = subcell.basic_name().replace(' ','_')   # name library component
-    instance = subcell.name      
+    instance = subcell.name
 #    subcell.name                # name of the cell; for PCells, different from basic_name
 
     found_component = False
@@ -557,10 +559,10 @@ def find_components(self, verbose=False, cell_selected=None):
         print("%s: DevRec in cell {%s}, polygon -- %s" % (idx, subcell.basic_name(), polygon))
       found_component = True
 
-    # A component was found. record the instance info as a Component 
+    # A component was found. record the instance info as a Component
     if found_component:
       # check if the component is flattened, or a hierarchical sub-cell
-      if self == subcell: 
+      if self == subcell:
         # Save the flattened component into the components list
         components.append( Component(component = "Flattened", basic_name = "Flattened", idx=idx, polygon=polygon, trans=iter1.trans() ) )
       else:
@@ -583,7 +585,7 @@ def find_components(self, verbose=False, cell_selected=None):
             if text.string.find("Component=") > -1:
               component = text.string[len("Component="):]
             if text.string.find("Component_ID=") > -1:
-              cID = int(text.string[len("Component_ID="):]) 
+              cID = int(text.string[len("Component_ID="):])
               if cID > 0:
                 component_ID = cID
             if text.string.find("Spice_param:") > -1:
@@ -592,25 +594,25 @@ def find_components(self, verbose=False, cell_selected=None):
         if library == None:
           if verbose:
             print("Missing library information for component: %s" % component )
-  
-        # Save the component into the components list      
+
+        # Save the component into the components list
         components.append(Component(idx=component_ID, \
            component=component, instance=instance, trans=iter1.trans(), library=library, params=spice_params, polygon=polygon, DevRec_polygon = DevRec_polygon, cell=subcell, basic_name=subcell.basic_name()) )
-  
+
         # find the component pins, and Sort by pin text labels
         pins = sorted(subcell.find_pins_component(components[-1]), key=lambda  p:  '' if p.pin_name==None else p.pin_name)
-  
+
         # find_pins returns pin locations within the subcell; transform to the top cell:
         [p.transform(iter1.trans()) for p in pins]
-  
+
         # store the pins in the component
         components[-1].pins=pins
 
     iter1.next()
-  # end while iter1 
+  # end while iter1
   return components
 # end def find_components
-  
+
 
 
 def identify_nets(self, verbose=False):
@@ -630,16 +632,16 @@ def identify_nets(self, verbose=False):
   # find components and pins in the cell layout
   components = self.find_components()
   pins = self.find_pins()
-  
+
   # Optical Pins:
   optical_pins = [p for p in pins if p.type==_globals.PIN_TYPES.OPTICAL]
-  
+
   # Loop through all pairs components (c1, c2); only look at touching components
   for c1 in components:
     for c2 in components [ c1.idx+1: len(components) ]:
       if verbose:
         print( " - Components: [%s-%s], [%s-%s].  Pins: %s, %s"
-          % (c1.component, c1.idx, c2.component, c2.idx, c1.pins, c2.pins ) )     
+          % (c1.component, c1.idx, c2.component, c2.idx, c1.pins, c2.pins ) )
 
       if c1.polygon.bbox().overlaps(c2.polygon.bbox()) or c1.polygon.bbox().touches(c2.polygon.bbox()):
         # Loop through all the pins (p1) in c1
@@ -648,11 +650,11 @@ def identify_nets(self, verbose=False):
           for p2 in c2.pins:
             if verbose:
               print( " - Components, pins: [%s-%s, %s, %s, %s], [%s-%s, %s, %s, %s]; difference: %s"
-                % (c1.component, c1.idx, p1.pin_name, p1.center, p1.rotation, c2.component, c2.idx, p2.pin_name, p2.center, p2.rotation, p1.center-p2.center) )      
+                % (c1.component, c1.idx, p1.pin_name, p1.center, p1.rotation, c2.component, c2.idx, p2.pin_name, p2.center, p2.rotation, p1.center-p2.center) )
             # check that pins are facing each other, 180 degree
             check1 = ((p1.rotation - p2.rotation)%360) == 180
-      
-            # check that the pin centres are perfectly overlapping 
+
+            # check that the pin centres are perfectly overlapping
             # (to avoid slight disconnections, and phase errors in simulations)
             check2 = (p1.center == p2.center)
 
@@ -664,11 +666,11 @@ def identify_nets(self, verbose=False):
               # assign this net number to the pins
               p1.net = nets[-1]
               p2.net = nets[-1]
-              
+
               if verbose:
-                print( " - pin-pin, net: %s, component, pin: [%s-%s, %s, %s, %s], [%s-%s, %s, %s, %s]" 
-                  % (net_idx, c1.component, c1.idx, p1.pin_name, p1.center, p1.rotation, c2.component, c2.idx, p2.pin_name, p2.center, p2.rotation) )      
-      
+                print( " - pin-pin, net: %s, component, pin: [%s-%s, %s, %s, %s], [%s-%s, %s, %s, %s]"
+                  % (net_idx, c1.component, c1.idx, p1.pin_name, p1.center, p1.rotation, c2.component, c2.idx, p2.pin_name, p2.center, p2.rotation) )
+
   return nets, components
 
 
@@ -685,9 +687,9 @@ def get_LumericalINTERCONNECT_analyzers(self, components, verbose=None):
   get their parameters
   determine which OpticalIO they are connected to, and find their nets
   Assume that the detectors and laser are on the topcell (not subcells); don't perform transformations.
-  
+
   returns: parameters, nets in order
-  
+
   usage:
   laser_net, detector_nets, wavelength_start, wavelength_stop, wavelength_points, ignoreOpticalIOs = get_LumericalINTERCONNECT_analyzers(topcell, components)
   """
@@ -698,18 +700,18 @@ def get_LumericalINTERCONNECT_analyzers(self, components, verbose=None):
   from .utils import select_paths, get_technology
   from .core import Net
   TECHNOLOGY = get_technology()
-  
+
   layout = topcell.layout()
   LayerLumericalN = self.layout().layer(TECHNOLOGY['Lumerical'])
 
-  
+
   # default is the 1st polarization
   orthogonal_identifier = 1
-      
+
   # Find the laser and detectors in the layout.
   iter1 = topcell.begin_shapes_rec(LayerLumericalN)
   n_IO = 0
-  detectors_info = []  
+  detectors_info = []
   laser_net = None
   wavelength_start, wavelength_stop, wavelength_points, orthogonal_identifier, ignoreOpticalIOs = 0,0,0,0,0
   while not(iter1.at_end()):
@@ -727,7 +729,7 @@ def get_LumericalINTERCONNECT_analyzers(self, components, verbose=None):
         if len(components_IO) > 1:
           raise Exception("Error - more than 1 optical IO connected to the detector.")
         if len(components_IO) == 0:
-           print("Warning - No optical IO connected to the detector.") 
+           print("Warning - No optical IO connected to the detector.")
 #          raise Exception("Error - 0 optical IO connected to the detector.")
         else:
           p = [p for p in components_IO[0].pins if p.type == _globals.PIN_TYPES.OPTICALIO]
@@ -762,10 +764,10 @@ def get_LumericalINTERCONNECT_analyzers(self, components, verbose=None):
             print(" - pin_name: %s"   % (p[0].pin_name) )
 
     iter1.next()
-    
+
   # Sort the detectors:
   detectors_info2 = sorted(detectors_info, key=lambda  d: d.detector_number)
-    
+
   # output:
   detector_nets = []
   for d in detectors_info2:
@@ -779,9 +781,9 @@ Find 1 opt_in label, and return lasers and detectors
 def get_LumericalINTERCONNECT_analyzers_from_opt_in(self, components, verbose=None, opt_in_selection_text=[]):
   """
   From the opt_in label, find the trimmed circuit, and assign a laser and detectors
-  
+
   returns: parameters, nets in order
-  
+
   usage:
   laser_net, detector_nets, wavelength_start, wavelength_stop, wavelength_points, ignoreOpticalIOs = get_LumericalINTERCONNECT_analyzers_from_opt_in(topcell, components)
   """
@@ -794,7 +796,7 @@ def get_LumericalINTERCONNECT_analyzers_from_opt_in(self, components, verbose=No
     if verbose:
       print(' no DFT rules available.')
     return False, False, False, False, False, False, False
-    
+
   from .scripts import user_select_opt_in
   opt_in_selection_text, opt_in_dict = user_select_opt_in(verbose=verbose, option_all=False, opt_in_selection_text=opt_in_selection_text)
   if not opt_in_dict:
@@ -826,30 +828,32 @@ def get_LumericalINTERCONNECT_analyzers_from_opt_in(self, components, verbose=No
   laser_net = p[0].net=Net(idx=p[0].pin_name, pins=p)
   if verbose:
     print(" - pin_name: %s"   % (p[0].pin_name) )
-  
+
   if DFT['design-for-test']['tunable-laser']['wavelength'] == opt_in_dict[0]['wavelength']:
     wavelength_start, wavelength_stop, wavelength_points = float(DFT['design-for-test']['tunable-laser']['wavelength-start']), float(DFT['design-for-test']['tunable-laser']['wavelength-stop']), int(DFT['design-for-test']['tunable-laser']['wavelength-points'])
   else:
-    warning = pya.QMessageBox()
-    warning.setStandardButtons(pya.QMessageBox.Ok)
-    warning.setText("No laser at %s nm is available. Tunable laser definition is in the technology's DFT.xml file." % opt_in_dict[0]['wavelength'])
-    pya.QMessageBox_StandardButton(warning.exec_())
+    if not is_batch_mode:
+      warning = pya.QMessageBox()
+      warning.setStandardButtons(pya.QMessageBox.Ok)
+      warning.setText("No laser at %s nm is available. Tunable laser definition is in the technology's DFT.xml file." % opt_in_dict[0]['wavelength'])
+      pya.QMessageBox_StandardButton(warning.exec_())
     return False, False, False, False, False, False, False
 
   if opt_in_dict[0]['pol'] == 'TE':
     orthogonal_identifier = 1
   elif opt_in_dict[0]['pol'] == 'TM':
     orthogonal_identifier = 2
-  else: 
-    warning = pya.QMessageBox()
-    warning.setStandardButtons(pya.QMessageBox.Ok)
-    warning.setText("Unknown polarization: %s." % opt_in_dict[0]['pol'])
-    pya.QMessageBox_StandardButton(warning.exec_())
+  else:
+    if not is_batch_mode:
+      warning = pya.QMessageBox()
+      warning.setStandardButtons(pya.QMessageBox.Ok)
+      warning.setText("Unknown polarization: %s." % opt_in_dict[0]['pol'])
+      pya.QMessageBox_StandardButton(warning.exec_())
     return False, False, False, False, False, False, False
   ignoreOpticalIOs = False
-      
+
   # find the GCs in the circuit and connect detectors based on DFT rules
-  detectors_info = []  
+  detectors_info = []
   detector_number = 0
   for d in list(range(int(DFT['design-for-test']['grating-couplers']['detectors-above-laser'])+0,0,-1)) + list(range(-1, -int(DFT['design-for-test']['grating-couplers']['detectors-below-laser'])-1,-1)):
     if pya.DPoint(0,d*float(DFT['design-for-test']['grating-couplers']['gc-pitch'])*1000) in vect_optin_GCs:
@@ -866,23 +870,23 @@ def get_LumericalINTERCONNECT_analyzers_from_opt_in(self, components, verbose=No
 
   # Sort the detectors:
   detectors_info2 = sorted(detectors_info, key=lambda  d: d.detector_number)
-    
+
   # output:
   detector_nets = []
   for d in detectors_info2:
     detector_nets.append (d.detector_net)
-    
+
 
   return laser_net, detector_nets, wavelength_start, wavelength_stop, wavelength_points, orthogonal_identifier, ignoreOpticalIOs
-  
+
 
 # generate spice netlist file
-# example output:         
+# example output:
 # X_grating_coupler_1 N$7 N$6 grating_coupler library="custom/genericcml" sch_x=-1.42 sch_y=-0.265 sch_r=0 sch_f=false
-def spice_netlist_export(self, verbose = False, opt_in_selection_text=[]):        
+def spice_netlist_export(self, verbose = False, opt_in_selection_text=[]):
   import SiEPIC
   from . import _globals
-  from time import strftime 
+  from time import strftime
   from .utils import eng_str
 
   from .utils import get_technology
@@ -904,16 +908,17 @@ def spice_netlist_export(self, verbose = False, opt_in_selection_text=[]):
         get_LumericalINTERCONNECT_analyzers(self, components, verbose=verbose)
 
   # if Laser and Detectors are not defined
-  if not laser_net or not detector_nets:  
-    # Use opt_in labels    
+  if not laser_net or not detector_nets:
+    # Use opt_in labels
     laser_net, detector_nets, wavelength_start, wavelength_stop, wavelength_points, orthogonal_identifier, ignoreOpticalIOs = \
         get_LumericalINTERCONNECT_analyzers_from_opt_in(self, components, verbose=verbose, opt_in_selection_text=opt_in_selection_text)
-        
+
     if not laser_net or not detector_nets:
-      warning = pya.QMessageBox()
-      warning.setStandardButtons(pya.QMessageBox.Ok)
-      warning.setText("To run a simulation, you need to define a laser and detector(s), or have an opt_in label.")
-      pya.QMessageBox_StandardButton(warning.exec_())
+      if not is_batch_mode:
+        warning = pya.QMessageBox()
+        warning.setStandardButtons(pya.QMessageBox.Ok)
+        warning.setText("To run a simulation, you need to define a laser and detector(s), or have an opt_in label.")
+        pya.QMessageBox_StandardButton(warning.exec_())
       return '', '', 0
 
   # trim the netlist, based on where the laser is connected
@@ -921,10 +926,10 @@ def spice_netlist_export(self, verbose = False, opt_in_selection_text=[]):
 
   from .scripts import trim_netlist
   nets, components = trim_netlist (nets, components, laser_component[0])
-  
+
   if not components:
     return '', '', 0
-  
+
 
   if verbose:
     print ("* Display list of components:" )
@@ -949,7 +954,7 @@ def spice_netlist_export(self, verbose = False, opt_in_selection_text=[]):
        (180, True):[0,True], \
        (270, True):[270, False]}
 
-  # Determine the Layout-to-Schematic (x,y) coordinate scaling       
+  # Determine the Layout-to-Schematic (x,y) coordinate scaling
   # Find the distances between all the components, in order to determine scaling
   sch_positions = [o.Dcenter for o in components]
   sch_distances = []
@@ -968,7 +973,7 @@ def spice_netlist_export(self, verbose = False, opt_in_selection_text=[]):
   # but if the layout is too big, limit the size
   MAX_size = 0.05*1e3
   if max(sch_distances)*Lumerical_schematic_scaling > MAX_size:
-    Lumerical_schematic_scaling = MAX_size / max(sch_distances) 
+    Lumerical_schematic_scaling = MAX_size / max(sch_distances)
   print ("Scaling for Lumerical INTERCONNECT schematic: %s" % Lumerical_schematic_scaling)
 
   # find electrical IO pins
@@ -979,7 +984,7 @@ def spice_netlist_export(self, verbose = False, opt_in_selection_text=[]):
   # (1) attach all electrical pins to the same DC source
   # (2) or to individual DC sources
   # (3) or choose based on number of DC sources, if > 5, use single DC source
-  
+
   # create individual sources:
   for c in components:
     for p in c.pins:
@@ -989,7 +994,7 @@ def spice_netlist_export(self, verbose = False, opt_in_selection_text=[]):
         DCsources += "N" + str(Vn) + NetName + " dcsource amplitude=0 sch_x=%s sch_y=%s\n" % (-2-Vn/3., -2+Vn/8.)
         Vn += 1
   electricalIO_pins_subckt = electricalIO_pins
-  
+
   # create 1 source
   if (SINGLE_DC_SOURCE == 1) or ( (SINGLE_DC_SOURCE == 3) and (Vn > 5)):
     electricalIO_pins_subckt = ""
@@ -1016,11 +1021,11 @@ def spice_netlist_export(self, verbose = False, opt_in_selection_text=[]):
   # create the top subckt:
   text_subckt += '.subckt %s%s%s\n' % (circuit_name, electricalIO_pins, opticalIO_pins)
   text_subckt += '.param MC_uniformity_width=0 \n' # assign MC settings before importing netlist components
-  text_subckt += '.param MC_uniformity_thickness=0 \n' 
-  text_subckt += '.param MC_resolution_x=100 \n' 
-  text_subckt += '.param MC_resolution_y=100 \n' 
-  text_subckt += '.param MC_grid=10e-6 \n' 
-  text_subckt += '.param MC_non_uniform=99 \n' 
+  text_subckt += '.param MC_uniformity_thickness=0 \n'
+  text_subckt += '.param MC_resolution_x=100 \n'
+  text_subckt += '.param MC_resolution_y=100 \n'
+  text_subckt += '.param MC_grid=10e-6 \n'
+  text_subckt += '.param MC_non_uniform=99 \n'
 
   for c in components:
     # optical nets: must be ordered electrical, optical IO, then optical
@@ -1036,7 +1041,7 @@ def spice_netlist_export(self, verbose = False, opt_in_selection_text=[]):
         nets_str += " N$" + str(p.net.idx)
 
     trans = KLayoutInterconnectRotFlip[(c.trans.angle, c.trans.is_mirror())]
-     
+
     flip = ' sch_f=true' if trans[1] else ''
     if trans[0] > 0:
       rotate = ' sch_r=%s' % str(trans[0])
@@ -1045,16 +1050,16 @@ def spice_netlist_export(self, verbose = False, opt_in_selection_text=[]):
 
     # Check to see if this component is an Optical IO type.
     pinIOtype = any([p for p in c.pins if p.type == _globals.PIN_TYPES.OPTICALIO])
-        
+
     if ignoreOpticalIOs and pinIOtype:
       # Replace the Grating Coupler or Edge Coupler with a 0-length waveguide.
       component1 = "ebeam_wg_strip_1550"
       params1 = "wg_length=0u wg_width=0.500u"
     else:
-      component1 =  c.component 
+      component1 =  c.component
       params1 = c.params
-      
-    text_subckt += ' %s %s %s ' % ( c.component.replace(' ', '_') +"_"+str(c.idx), nets_str, c.component.replace(' ', '_') ) 
+
+    text_subckt += ' %s %s %s ' % ( c.component.replace(' ', '_') +"_"+str(c.idx), nets_str, c.component.replace(' ', '_') )
     if c.library != None:
       text_subckt += 'library="%s" ' % c.library
     x, y = c.Dcenter.x, c.Dcenter.y
@@ -1068,7 +1073,7 @@ def spice_netlist_export(self, verbose = False, opt_in_selection_text=[]):
 
   if laser_net:
     text_main += '* Optical Network Analyzer:\n'
-    text_main += '.ona input_unit=wavelength input_parameter=start_and_stop\n  + minimum_loss=80\n  + analysis_type=scattering_data\n  + multithreading=user_defined number_of_threads=1\n' 
+    text_main += '.ona input_unit=wavelength input_parameter=start_and_stop\n  + minimum_loss=80\n  + analysis_type=scattering_data\n  + multithreading=user_defined number_of_threads=1\n'
     text_main += '  + orthogonal_identifier=%s\n' % orthogonal_identifier
     text_main += '  + start=%4.3fe-9\n' % wavelength_start
     text_main += '  + stop=%4.3fe-9\n' % wavelength_stop
@@ -1089,17 +1094,17 @@ def spice_netlist_export(self, verbose = False, opt_in_selection_text=[]):
   return text_subckt, text_main, len(detector_nets)
 
 def check_components_models():
-  
+
   # Check if all the components in the cell have compact models loaded in INTERCONNECT
-  
+
   # test for Component.has_compactmodel()
   from .utils import get_layout_variables
   TECHNOLOGY, lv, ly, cell = get_layout_variables()
-  
+
   print ("* find_components()" )
   components = cell.find_components ()
   print ("* Display list of components" )
-  
+
   if not all([c.has_model() for c in components]):
     # missing models, find which one
     components_havemodels = [[c.has_model(), c.component, c.instance] for c in components]
@@ -1137,7 +1142,7 @@ pya.Cell.spice_netlist_export = spice_netlist_export
 def find_pins(self):
 
   return [pin.transform(self.trans) for pin in self.cell.find_pins()]
-  
+
 #################################################################################
 
 pya.Instance.find_pins = find_pins
