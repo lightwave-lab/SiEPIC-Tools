@@ -218,6 +218,84 @@ def get_technology(verbose=False, query_activecellview_technology=False):
     return technology
 
 
+import os
+def get_active_technology():
+    ''' Gets it either from the current window (currently get_technology not working if you change it), or
+        If the application is not open, looks for the one that was active last time the application quit
+    '''
+    lv = pya.Application.instance().main_window().current_view()
+    if lv is not None:
+        return get_technology()
+    else:
+        # no layout open; use the one that was selected last time application quit
+        application_path = pya.Application.instance().application_data_path()
+        rc_file = os.path.join(application_path, 'klayoutrc')
+        with open(rc_file, 'r') as file:
+            rc_dict = xml_to_dict(file.read())
+        technology_name = rc_dict['config']['initial-technology']
+        return get_technology_by_name(technology_name)
+
+
+def tech_files(search_pattern, exactly_one=False):
+    ''' Searches the technology base path for a file search pattern.
+
+        Args:
+            search_pattern (str): file pattern. Default is all XML property files
+            exactly_one (bool): Do we expect to find exactly one matching file? If we don't, error
+    '''
+    dir_path = get_active_technology()['base_path']
+    matches = []
+    for root, dirnames, filenames in os.walk(dir_path, followlinks=True):
+        for filename in fnmatch.filter(filenames, search_pattern):
+            matches.append(os.path.join(root, filename))
+    if exactly_one:
+        if len(matches) == 0:
+            raise FileNotFoundError(f'Did not find a file matching {search_pattern} in {dir_path}')
+        elif len(matches) > 1:
+            raise FileNotFoundError(f'Pattern {search_pattern} not unique. Found the following:\n'
+                                    '\n'.join(matches))
+    return matches
+
+
+import fnmatch
+def tech_properties_dict(search_pattern='*.xml'):
+    ''' Puts everything that matches the search_pattern in one dictionary,
+        but errors if duplicate keys are found on the top level.
+
+        Returns:
+            (dict or None): None if no files matched. This is mainly for backwards compatibility
+    '''
+    if not search_pattern.endswith('.xml'):
+        if '.' in search_pattern:
+            raise ValueError('Technology properties are in .xml files only')
+        search_pattern += '.xml'
+    matching_files = tech_files(search_pattern)
+    if len(matching_files) == 0:
+        return None
+
+    full_dict = dict()
+    for match in matching_files:
+        try:
+            with open(match, 'r') as file:
+                this_dict = xml_to_dict(file.read())
+        except UserWarning as e:  # Happens when XML is corrupted
+            e.args = (e.args[0] + f' File {match}', )
+            raise
+        for prop, val in this_dict.items():
+            if prop in full_dict.keys():
+                raise ValueError(f'Duplicate top-level property category: {prop} in {match}')
+        full_dict.update(this_dict)
+    return full_dict
+
+
+def tech_xsection():
+    return tech_files('*.xs', exactly_one=True)[0]
+
+
+def tech_drc():
+    return tech_files('*.lydrc', exactly_one=True)[0]
+
+
 '''
 Load Waveguide configuration
 These are technology specific, and located in the tech folder, named WAVEGUIDES.xml
