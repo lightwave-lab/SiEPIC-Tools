@@ -296,6 +296,12 @@ def tech_drc():
     return tech_files('*.lydrc', exactly_one=True)[0]
 
 
+def tech_layer_properties():
+    siepic_tech = get_active_technology()
+    pya_tech = pya.Technology.technology_by_name(siepic_tech['technology_name'])
+    return os.path.join(pya_tech.base_path(), pya_tech.layer_properties_file)
+
+
 '''
 Load Waveguide configuration
 These are technology specific, and located in the tech folder, named WAVEGUIDES.xml
@@ -303,25 +309,17 @@ These are technology specific, and located in the tech folder, named WAVEGUIDES.
 
 
 def load_Waveguides():
-    import os
-    import fnmatch
-    from . import get_technology
-    TECHNOLOGY = get_technology()
-    tech_name = TECHNOLOGY['technology_name']
-    paths = []
-    for root, dirnames, filenames in os.walk(pya.Application.instance().application_data_path(), followlinks=True):
-        [paths.append(os.path.join(root, filename))
-         for filename in fnmatch.filter(filenames, 'WAVEGUIDES.xml') if tech_name in root]
+    settings = tech_properties_dict('WAVEGUIDES.xml')
+    if settings is None:
+        return None
+    waveguides = settings['waveguides']['waveguide']
+    if not isinstance(waveguides, list):
+        waveguides = [waveguides]
+    for waveguide in waveguides:
+        if not isinstance(waveguide['component'], list):
+            waveguide['component'] = [waveguide['component']]
+    return waveguides
 
-    waveguides = []
-    if paths:
-        with open(paths[0], 'r') as file:
-            waveguides = xml_to_dict(file.read())
-            waveguides = waveguides['waveguides']['waveguide']
-            for waveguide in waveguides:
-                if not isinstance(waveguide['component'], list):
-                    waveguide['component'] = [waveguide['component']]
-    return waveguides if waveguides else None
 
 '''
 Load Calibre configuration
@@ -330,27 +328,8 @@ These are technology specific, and located in the tech folder, named CALIBRE.xml
 
 
 def load_Calibre():
-    from . import get_technology
-    TECHNOLOGY = get_technology()
-    tech_name = TECHNOLOGY['technology_name']
+    return tech_properties_dict('CALIBRE.xml')
 
-    import os
-    import fnmatch
-    dir_path = pya.Application.instance().application_data_path()
-    search_str = 'CALIBRE.xml'
-    matches = []
-    for root, dirnames, filenames in os.walk(dir_path, followlinks=True):
-        for filename in fnmatch.filter(filenames, search_str):
-            if tech_name in root:
-                matches.append(os.path.join(root, filename))
-    if matches:
-        CALIBRE_file = matches[0]
-        file = open(CALIBRE_file, 'r')
-        CALIBRE = xml_to_dict(file.read())
-        file.close()
-        return CALIBRE
-    else:
-        return None
 
 '''
 Load Monte Carlo configuration
@@ -359,22 +338,14 @@ These are technology specific, and located in the tech folder, named MONTECARLO.
 
 
 def load_Monte_Carlo():
-    import os
-    import fnmatch
-    from . import get_technology
-    TECHNOLOGY = get_technology()
-    tech_name = TECHNOLOGY['technology_name']
-    paths = []
-    for root, dirnames, filenames in os.walk(pya.Application.instance().application_data_path(), followlinks=True):
-        [paths.append(os.path.join(root, filename))
-         for filename in fnmatch.filter(filenames, 'MONTECARLO.xml') if tech_name in root]
-    if paths:
-        with open(paths[0], 'r') as file:
-            montecarlo = xml_to_dict(file.read())
-            montecarlo = montecarlo['technologies']['technology']
-            if not isinstance(montecarlo, list):
-                montecarlo = [montecarlo]
-    return montecarlo if montecarlo else None
+    settings = tech_properties_dict('MONTECARLO.xml')
+    if settings is None:
+        return None
+    montecarlo = settings['technologies']['technology']
+    if not isinstance(montecarlo, list):
+        montecarlo = [montecarlo]
+    return montecarlo
+
 
 '''
 Load Design-for-Test (DFT) rules
@@ -383,27 +354,8 @@ These are technology specific, and located in the tech folder, named DFT.xml
 
 
 def load_DFT():
-    from . import get_technology
-    TECHNOLOGY = get_technology()
-    tech_name = TECHNOLOGY['technology_name']
+    return tech_properties_dict('DFT.xml')
 
-    import os
-    import fnmatch
-    dir_path = pya.Application.instance().application_data_path()
-    search_str = 'DFT.xml'
-    matches = []
-    for root, dirnames, filenames in os.walk(dir_path, followlinks=True):
-        for filename in fnmatch.filter(filenames, search_str):
-            if tech_name in root:
-                matches.append(os.path.join(root, filename))
-    if matches:
-        DFT_file = matches[0]
-        file = open(DFT_file, 'r')
-        DFT = xml_to_dict(file.read())
-        file.close()
-        return DFT
-    else:
-        return None
 
 '''
 Load FDTD settings
@@ -412,34 +364,14 @@ These are technology specific, and located in the tech folder, named FDTD.xml
 
 
 def load_FDTD_settings():
-    from . import get_technology
-    TECHNOLOGY = get_technology()
-    tech_name = TECHNOLOGY['technology_name']
-
-    import os
-    import fnmatch
-    dir_path = pya.Application.instance().application_data_path()
-    search_str = 'FDTD.xml'
-    matches = []
-    for root, dirnames, filenames in os.walk(dir_path, followlinks=True):
-        for filename in fnmatch.filter(filenames, search_str):
-            if tech_name in root:
-                matches.append(os.path.join(root, filename))
-    if matches:
-        f = matches[0]
-        file = open(f, 'r')
-        FDTD = xml_to_dict(file.read())
-        file.close()
-
-        FDTD = FDTD['FDTD']
-        FDTD1 = {}
-        for k in FDTD['floats'].keys():
-            FDTD1[k] = float(FDTD['floats'][k])
-        for k in FDTD['strings'].keys():
-            FDTD1[k] = FDTD['strings'][k]
-        return FDTD1
-    else:
+    settings = tech_properties_dict('FDTD.xml')
+    if settings is None:
         return None
+    FDTD = settings['FDTD']
+    FDTD1 = {}
+    FDTD1.update((k, float(v)) for k, v in FDTD['floats'].items())
+    FDTD1.update(FDTD['strings'])
+    return FDTD1
 
 
 '''
@@ -449,34 +381,14 @@ These are technology specific, and located in the tech folder, named GC.xml
 
 
 def load_GC_settings():
-    from . import get_technology
-    TECHNOLOGY = get_technology()
-    tech_name = TECHNOLOGY['technology_name']
-
-    import os
-    import fnmatch
-    dir_path = pya.Application.instance().application_data_path()
-    search_str = 'GC.xml'
-    matches = []
-    for root, dirnames, filenames in os.walk(dir_path, followlinks=True):
-        for filename in fnmatch.filter(filenames, search_str):
-            if tech_name in root:
-                matches.append(os.path.join(root, filename))
-    if matches:
-        f = matches[0]
-        file = open(f, 'r')
-        GC = xml_to_dict(file.read())
-        file.close()
-
-        GC = GC['GC']
-        GC1 = {}
-        for k in GC['floats'].keys():
-            GC1[k] = float(GC['floats'][k])
-        for k in GC['strings'].keys():
-            GC1[k] = GC['strings'][k]
-        return GC1
-    else:
+    xxx = tech_properties_dict('GC.xml', exactly_one=True)
+    if xxx is None:
         return None
+    GC = xxx['GC']
+    GC1 = {}
+    GC1.update((k, float(v)) for k, v in GC['floats'].items())
+    GC1.update(GC['strings'])
+    return GC1
 
 
 def get_layout_variables():
