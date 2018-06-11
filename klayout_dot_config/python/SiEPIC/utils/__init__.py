@@ -401,25 +401,32 @@ def load_GC_settings():
         return None
 
 
-def get_layout_variables():
-    from . import get_technology
-    TECHNOLOGY = get_technology()
-
-    # Configure variables to find in the presently selected cell:
+def get_layout_variables_no_tech(cell=None):
+    ''' Similar to get_layout_variables, except without looking at TECHNOLOGY
+        and with the option to specify a cell
+    '''
     lv = pya.Application.instance().main_window().current_view()
     if lv == None:
         print("No view selected")
         raise UserWarning("No view selected. Make sure you have an open layout.")
-    # Find the currently selected layout.
-    ly = pya.Application.instance().main_window().current_view().active_cellview().layout()
-    if ly == None:
-        raise UserWarning("No layout. Make sure you have an open layout.")
-    # find the currently selected cell:
-    cv = pya.Application.instance().main_window().current_view().active_cellview()
-    cell = pya.Application.instance().main_window().current_view().active_cellview().cell
-    if cell == None:
-        raise UserWarning("No cell. Make sure you have an open layout.")
+    if cell is None:
+        # Find the currently selected layout.
+        ly = lv.active_cellview().layout()
+        if ly is None:
+            raise UserWarning("No layout. Make sure you have an open layout.")
+        # find the currently selected cell:
+        cell = lv.active_cellview().cell
+        if cell is None:
+            raise UserWarning("No cell. Make sure you have an open layout.")
+    else:
+        ly = cell.layout()
+    return lv, ly, cell
 
+
+def get_layout_variables():
+    from . import get_technology
+    TECHNOLOGY = get_technology()
+    lv, ly, cell = get_layout_variables_no_tech(cell=None)
     return TECHNOLOGY, lv, ly, cell
 
 
@@ -428,18 +435,7 @@ def get_layout_variables():
 
 
 def find_paths(layer, cell=None):
-    lv = pya.Application.instance().main_window().current_view()
-    if lv == None:
-        raise Exception("No view selected")
-    if cell is None:
-        ly = lv.active_cellview().layout()
-        if ly == None:
-            raise Exception("No active layout")
-        cell = lv.active_cellview().cell
-        if cell == None:
-            raise Exception("No active cell")
-    else:
-        ly = cell.layout()
+    lv, ly, cell = get_layout_variables_no_tech(cell=cell)
 
     selection = []
     itr = cell.begin_shapes_rec(ly.layer(layer))
@@ -469,19 +465,7 @@ def select_paths(layer, cell=None, verbose=None):
     if verbose:
         print("SiEPIC.utils.select_paths: layer: %s" % layer)
 
-    lv = pya.Application.instance().main_window().current_view()
-    if lv == None:
-        raise Exception("No view selected")
-
-    if cell is None:
-        ly = lv.active_cellview().layout()
-        if ly == None:
-            raise Exception("No active layout")
-        cell = lv.active_cellview().cell
-        if cell == None:
-            raise Exception("No active cell")
-    else:
-        ly = cell.layout()
+    lv, ly, cell = get_layout_variables_no_tech(cell=cell)
 
     selection = lv.object_selection
     if selection == []:
@@ -511,19 +495,7 @@ def select_paths(layer, cell=None, verbose=None):
 
 
 def select_waveguides(cell=None):
-    lv = pya.Application.instance().main_window().current_view()
-    if lv == None:
-        raise Exception("No view selected")
-
-    if cell is None:
-        ly = lv.active_cellview().layout()
-        if ly == None:
-            raise Exception("No active layout")
-        cell = lv.active_cellview().cell
-        if cell == None:
-            raise Exception("No active cell")
-    else:
-        ly = cell.layout()
+    lv, ly, cell = get_layout_variables_no_tech(cell=cell)
 
     selection = lv.object_selection
     if selection == []:
@@ -544,18 +516,7 @@ def select_waveguides(cell=None):
 
 
 def select_instances(cell=None):
-    lv = pya.Application.instance().main_window().current_view()
-    if lv == None:
-        raise Exception("No view selected")
-    if cell is None:
-        ly = lv.active_cellview().layout()
-        if ly == None:
-            raise Exception("No active layout")
-        cell = lv.active_cellview().cell
-        if cell == None:
-            raise Exception("No active cell")
-    else:
-        ly = cell.layout()
+    lv, ly, cell = get_layout_variables_no_tech(cell=cell)
 
     selection = lv.object_selection
     if selection == []:
