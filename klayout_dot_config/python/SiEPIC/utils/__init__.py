@@ -218,22 +218,43 @@ def get_technology(verbose=False, query_activecellview_technology=False):
     return technology
 
 
+#: only relevant when running outside of a GUI
+_active_technology_name = None
+
+
 import os
 def get_active_technology():
-    ''' Gets it either from the current window (currently get_technology not working if you change it), or
-        If the application is not open, looks for the one that was active last time the application quit
+    ''' Trys to find the active technology in a way that is GUI and non-GUI compatible.
+
+        Gets it from, in order of precedence,
+            1. the one active in the current window, or
+            2. the one manually set with ``set_active_technology``, or
+            3. the one that was active last time the application quit
     '''
     lv = pya.Application.instance().main_window().current_view()
     if lv is not None:
+        # Happens when operating in klayout window
         return get_technology()
     else:
-        # no layout open; use the one that was selected last time application quit
-        application_path = pya.Application.instance().application_data_path()
-        rc_file = os.path.join(application_path, 'klayoutrc')
-        with open(rc_file, 'r') as file:
-            rc_dict = xml_to_dict(file.read())
-        technology_name = rc_dict['config']['initial-technology']
-        return get_technology_by_name(technology_name)
+        # Happens when operating from code
+        global _active_technology_name
+        if _active_technology_name is None:
+            application_path = pya.Application.instance().application_data_path()
+            rc_file = os.path.join(application_path, 'klayoutrc')
+            with open(rc_file, 'r') as file:
+                rc_dict = xml_to_dict(file.read())
+            _active_technology_name = rc_dict['config']['initial-technology']
+        return get_technology_by_name(_active_technology_name)
+
+
+def set_active_technology(technology_name):
+    ''' This has no effect in GUI mode. It would only be called by a script '''
+    lv = pya.Application.instance().main_window().current_view()
+    if lv is not None:
+        return
+    else:
+        global _active_technology_name
+        _active_technology_name = technology_name
 
 
 def tech_files(search_pattern, exactly_one=False):
@@ -297,6 +318,10 @@ def tech_drc():
 
 
 def tech_layer_properties():
+    ''' This does not search the technology path for .lyp files because there could be multiple.
+
+        Instead it is specified in the KLayout technolgy (.lyt file)
+    '''
     siepic_tech = get_active_technology()
     pya_tech = pya.Technology.technology_by_name(siepic_tech['technology_name'])
     return os.path.join(pya_tech.base_path(), pya_tech.layer_properties_file)
