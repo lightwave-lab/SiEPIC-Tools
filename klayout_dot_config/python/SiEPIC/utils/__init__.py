@@ -615,8 +615,7 @@ def angle_trunc(a, trunc):
 # http://stackoverflow.com/questions/11774038/how-to-render-a-circle-with-as-few-vertices-as-possible
 def points_per_circle(radius):
     from math import acos, pi, ceil
-    from . import get_technology
-    TECHNOLOGY = get_technology()
+    TECHNOLOGY = get_active_technology()
     err = 1e3 * TECHNOLOGY['dbu'] / 2
     return int(ceil(2 * pi / acos(2 * (1 - err / radius)**2 - 1))) if radius > 0.1 else 100
 
