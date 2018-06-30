@@ -142,7 +142,7 @@ class DSimplePolygon(pya.DSimplePolygon):
 
     def layout_drc_exclude(self, cell, drclayer, ex):
         """ Places a drc exclude square at every corner.
-        A corner is defined by an angle smaller than 170 degrees (conservative)
+        A corner is defined by an angle greater than 30 degrees (conservative)
         """
         if drclayer is not None:
             points = list(self.each_point())
@@ -152,9 +152,13 @@ class DSimplePolygon(pya.DSimplePolygon):
             for i in range(len(points)):
                 delta = points[i] - points[i - 1]
                 angle = np.arctan2(delta.y, delta.x)
+                if delta.y == 0 or delta.x == 0:
+                    thresh_angle = pi / 2
+                else:
+                    thresh_angle = pi * 85 / 180
                 delta_angle = angle - prev_angle
                 delta_angle = abs(((delta_angle + pi) % (2 * pi)) - pi)
-                if delta_angle >= pi * 10 / 180:
+                if delta_angle > thresh_angle:
                     layout_square(cell, drclayer, points[i - 1], 0.1, ex)
                 prev_delta, prev_angle = delta, angle
 
@@ -289,6 +293,8 @@ def waveguide_dpolygon(points_list, width, dbu, smooth=True):
         backward_point_low = (point + 0.5 * width *
                               pya.DPoint(cos(theta_prev - pi / 2), sin(theta_prev - pi / 2)))
 
+        fix_angle = lambda theta: ((theta + pi) % (2 * pi)) - pi
+
         # High point decision
         next_high_edge = pya.DEdge(forward_point_high, next_point_high)
         prev_high_edge = pya.DEdge(backward_point_high, prev_point_high)
@@ -297,7 +303,8 @@ def waveguide_dpolygon(points_list, width, dbu, smooth=True):
             intersect_point = next_high_edge.crossing_point(prev_high_edge)
             points_high.append(intersect_point)
         else:
-            if width * (1 - cos_angle(delta_next, delta_prev)) > dbu:
+            cos_dd = cos_angle(delta_next, delta_prev)
+            if width * (1 - cos_dd) > dbu and fix_angle(theta_next - theta_prev) < 0:
                 points_high.append(backward_point_high)
                 points_high.append(forward_point_high)
             else:
@@ -311,7 +318,8 @@ def waveguide_dpolygon(points_list, width, dbu, smooth=True):
             intersect_point = next_low_edge.crossing_point(prev_low_edge)
             points_low.append(intersect_point)
         else:
-            if width * (1 - cos_angle(delta_next, delta_prev)) > dbu:
+            cos_dd = cos_angle(delta_next, delta_prev)
+            if width * (1 - cos_dd) > dbu and fix_angle(theta_next - theta_prev) > 0:
                 points_low.append(backward_point_low)
                 points_low.append(forward_point_low)
             else:
@@ -330,10 +338,8 @@ def waveguide_dpolygon(points_list, width, dbu, smooth=True):
     if (final_low_point - points_low[-1]) * delta > 0:
         points_low.append(final_low_point)
 
-    # Append point only if change in direction is less than 120 degrees.
+    # Append point only if change in direction is less than 130 degrees.
     def smooth_append(point_list, point):
-        if point_list is None:
-            print(point)
         if len(point_list) < 1:
             point_list.append(point)
             return point_list
@@ -346,12 +352,20 @@ def waveguide_dpolygon(points_list, width, dbu, smooth=True):
         curr_edge = point - point_list[-1]
         if norm(curr_edge) >= dbu:
             prev_edge = point_list[-1] - point_list[-2]
-            if norm(prev_edge) * sin_angle(curr_edge + prev_edge, prev_edge) > dbu:
+
+            if norm(prev_edge) * abs(sin_angle(curr_edge + prev_edge, prev_edge)) > dbu:
                 if smooth:
+                    # avoid corners when smoothing
                     if cos_angle(curr_edge, prev_edge) > cos(130 / 180 * pi):
                         point_list.append(point)
+                    else:
+                        # edge case when there is prev_edge is small and
+                        # needs to be deleted to get rid of the corner
+                        if norm(curr_edge) > norm(prev_edge):
+                            point_list[-1] = point
                 else:
                     point_list.append(point)
+            # avoid unnecessary points
             else:
                 point_list[-1] = point
         return point_list
@@ -361,8 +375,12 @@ def waveguide_dpolygon(points_list, width, dbu, smooth=True):
         for point, width in point_width_list:
             print(point, width)
 
-    polygon_dpoints = points_high + list(reversed(points_low))
-    polygon_dpoints = list(reduce(smooth_append, polygon_dpoints, list()))
+    smooth_points_high = list(reduce(smooth_append, points_high, list()))
+    smooth_points_low = list(reduce(smooth_append, points_low, list()))
+    # smooth_points_low = points_low
+    # polygon_dpoints = points_high + list(reversed(points_low))
+    # polygon_dpoints = list(reduce(smooth_append, polygon_dpoints, list()))
+    polygon_dpoints = smooth_points_high + list(reversed(smooth_points_low))
     return DSimplePolygon(polygon_dpoints)
 
 
@@ -517,6 +535,7 @@ def layout_ring(cell, layer, center, r, w):
     dpoly.insert_hole(points_hole)
     dpoly.compress(True)
     insert_shape(cell, layer, dpoly)
+    return dpoly
 
 
 def layout_arc(cell, layer, center, r, w, theta_start, theta_end, ex=None,
@@ -732,7 +751,10 @@ def layout_rectangle(cell, layer, center, width, height, ex):
 
 
 def append_relative(points, *relative_vectors):
-    """ Appends to list of points in relative steps """
+    """ Appends to list of points in relative steps:
+        It takes a list of points, and adds new points to it in relative coordinates.
+        For example, if you call append_relative([A, B], C, D), the result will be [A, B, B+C, B+C+D].
+    """
     try:
         if len(points) > 0:
             origin = points[-1]
@@ -751,7 +773,7 @@ def layout_connect_ports(cell, layer, port_from, port_to, smooth=True):
         assert port_to.name.startswith("el")
         P0 = port_from.position + port_from.direction * port_from.width / 2
         P3 = port_to.position + port_to.direction * port_to.width / 2
-        smooth = smooth and False
+        smooth = smooth and True
     else:
         dbu = cell.layout().dbu
         P0 = port_from.position - dbu * port_from.direction
@@ -783,3 +805,10 @@ def layout_connect_ports_angle(cell, layer, port_from, port_to, angle):
         curve = bezier_optimal(P0, P3, angle, angle)
 
     return layout_waveguide_angle(cell, layer, curve, [port_from.width, port_to.width], angle)
+
+
+def layout_text(cell, layer_text, position, text_string, size):
+    dtext = pya.DText(str(text_string), pya.DTrans(
+        pya.DTrans.R0, position.x, position.y))
+    dtext.size = size
+    cell.shapes(layer_text).insert(dtext)
