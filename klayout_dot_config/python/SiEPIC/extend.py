@@ -57,9 +57,11 @@ pya.Point Extensions:
 
 import pya
 
-warning = pya.QMessageBox()
-warning.setStandardButtons(pya.QMessageBox.Ok)
-warning.setDefaultButton(pya.QMessageBox.Ok)
+from .utils import is_batch_mode
+if not is_batch_mode:
+    warning = pya.QMessageBox()
+    warning.setStandardButtons(pya.QMessageBox.Ok)
+    warning.setDefaultButton(pya.QMessageBox.Ok)
 
 #################################################################################
 #                SiEPIC Class Extension of Path & DPath Class                   #
@@ -357,7 +359,7 @@ def print_parameter_list(self):
 
 #################################################################################
 
-pya.PCellDeclarationHelper.print_parameter_list = print_parameter_list
+# pya.PCellDeclarationHelper.print_parameter_list = print_parameter_list
 
 #################################################################################
 #                    SiEPIC Class Extension of Cell Class                       #
@@ -837,6 +839,9 @@ def get_LumericalINTERCONNECT_analyzers_from_opt_in(self, components, verbose=No
     from . import _globals
     from .core import Net
 
+    if not is_batch_mode:
+        return False, False, False, False, False, False, False, False
+
     from SiEPIC.utils import load_DFT
     DFT = load_DFT()
     if not DFT:
@@ -862,7 +867,7 @@ def get_LumericalINTERCONNECT_analyzers_from_opt_in(self, components, verbose=No
         warning.setText("To run a simulation, you need to have optical IO in the layout." )
         pya.QMessageBox_StandardButton(warning.exec_())
         return False, False, False, False, False, False, False, False
-        
+
     dist_optin_c = components_sorted[0].trans.disp.to_p().distance(pya.Point(t.x, t.y).to_dtype(1))
     if verbose:
         print(" - Found opt_in: %s, nearest GC: %s.  Locations: %s, %s. distance: %s" % (opt_in_dict[0][
@@ -980,7 +985,7 @@ def spice_netlist_export(self, verbose=False, opt_in_selection_text=[]):
             get_LumericalINTERCONNECT_analyzers_from_opt_in(
                 self, components, verbose=verbose, opt_in_selection_text=opt_in_selection_text)
 
-        if not laser_net or not detector_nets:
+        if not is_batch_mode and (not laser_net or not detector_nets):
             warning = pya.QMessageBox()
             warning.setStandardButtons(pya.QMessageBox.Ok)
             warning.setText(
@@ -1254,7 +1259,8 @@ pya.Point.to_dtype = to_dtype
 pya.Point.to_itype = to_itype
 
 # in v > 0.24, these are built-in to KLayout
-if int(pya.Application.instance().version().split('.')[1]) < 25:
+from ._globals import KLAYOUT_VERSION
+if KLAYOUT_VERSION < 25:
 
     def to_p(self):
         return self

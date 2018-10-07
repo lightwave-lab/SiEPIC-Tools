@@ -46,6 +46,9 @@ sample_function
 
 import pya
 
+import os
+envvar = os.getenv('KLAYOUT_BATCH_MODE', '0')
+is_batch_mode = (envvar == '1')
 
 # Python 2 vs 3 issues:  http://python3porting.com/differences.html
 # Python 2: iterator.next()
@@ -396,7 +399,7 @@ def load_GC_settings():
             GC1[k] = float(GC['floats'][k])
         for k in GC['strings'].keys():
             GC1[k] = GC['strings'][k]
-            #print(GC)
+            # print(GC)
         return GC1
     else:
         return None
@@ -601,9 +604,12 @@ def angle_trunc(a, trunc):
 # http://stackoverflow.com/questions/11774038/how-to-render-a-circle-with-as-few-vertices-as-possible
 def points_per_circle(radius):
     from math import acos, pi, ceil
-    from . import get_technology
-    TECHNOLOGY = get_technology()
-    err = 1e3 * TECHNOLOGY['dbu'] / 2
+    if is_batch_mode:
+        err = 1e3 * 0.001 / 2
+    else:
+        from . import get_technology
+        TECHNOLOGY = get_technology()
+        err = 1e3 * TECHNOLOGY['dbu'] / 2
     return int(ceil(2 * pi / acos(2 * (1 - err / radius)**2 - 1))) if radius > 100 else 100
 
 
